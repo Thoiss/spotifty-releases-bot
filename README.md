@@ -58,6 +58,11 @@ of failing silently.
 
 ## Setup
 
+> **Setting this up for the first time?** Follow **[SETUP.md](SETUP.md)** — a
+> step-by-step runbook with every command, including the WhatsApp Cloud API
+> setup and the file permissions that are easy to get wrong. The summary below
+> is for reference once you know the shape of it.
+
 ### 1. Spotify app
 
 1. Go to <https://developer.spotify.com/dashboard> and create an app.
