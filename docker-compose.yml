@@ -1,0 +1,22 @@
+services:
+  spotify-release-bot:
+    build: .
+    image: spotify-release-bot:latest
+    container_name: spotify-release-bot
+    restart: unless-stopped
+
+    # All secrets and settings live in .env (copy .env.example to .env first).
+    env_file:
+      - .env
+
+    # The state file records which releases were already handled, so a restart
+    # never means re-posting yesterday's songs to WhatsApp.
+    volumes:
+      - ./data:/data
+
+    # Logs stay useful without filling the disk on your home server.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
