@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spotify-release-bot"
+version = "1.0.0"
+description = "Adds new releases from followed Spotify artists to a playlist and announces them on WhatsApp"
+requires-python = ">=3.11"
+dependencies = ["requests>=2.32", "tzdata>=2024.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
