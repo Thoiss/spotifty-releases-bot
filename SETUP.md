@@ -57,7 +57,14 @@ You approve that once in a browser; the resulting refresh token does not
 expire, so the server never needs a browser again.
 
 Run this **on your laptop**, because the browser has to be able to reach
-`127.0.0.1:8080`:
+`127.0.0.1:8080`.
+
+> **Python 3.11 or newer is required.** Check with `python3 --version`
+> (macOS/Linux) or `py --version` (Windows). On Windows, `python3` is not a
+> real command — it hits a Microsoft Store stub that silently does nothing.
+> Use `py`, the Python launcher, instead.
+
+**macOS / Linux**
 
 ```bash
 git clone https://github.com/Thoiss/spotifty-releases-bot
@@ -65,11 +72,48 @@ cd spotifty-releases-bot
 git checkout claude/cool-ride-trzeoa
 
 python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 
 PYTHONPATH=src python -m spotify_release_bot authorize
 ```
+
+**Windows (PowerShell)**
+
+```powershell
+git clone https://github.com/Thoiss/spotifty-releases-bot
+cd spotifty-releases-bot
+git checkout claude/cool-ride-trzeoa
+
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+$env:PYTHONPATH = "src"
+python -m spotify_release_bot authorize
+```
+
+Note that `PYTHONPATH=src python ...` is shell syntax that does **not** work in
+PowerShell — set the variable on its own line as shown above.
+
+<details>
+<summary>Windows: two things that commonly get in the way</summary>
+
+**No suitable Python.** Install a current one and point the launcher at it:
+
+```powershell
+winget install Python.Python.3.12
+py -3.12 -m venv .venv
+```
+
+**"Running scripts is disabled on this system"** when activating. Allow it for
+this one terminal session only:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+</details>
 
 It asks for the client ID, the client secret and the redirect URI, then prints
 a long Spotify URL. Open it, approve the permissions, and the helper catches
