@@ -423,6 +423,17 @@ The `data` directory is owned by root. Fix it:
 sudo chown 10001:10001 data
 ```
 
+**`Invalid limit` on every artist**
+You are on an old version of the code, which asked Spotify for 50 albums per
+artist; that endpoint now rejects anything above 10. Update with
+`git pull && docker compose up -d --build`.
+
+**`Spotify has rate limited this app for Xh Ym`**
+Too many requests too quickly, and Spotify blocks an app for hours once that
+happens. Nothing can shorten it — the block has to expire. Make sure
+`SPOTIFY_REQUEST_DELAY` is set (0.35 is the default) so the next run paces
+itself, then try again once the time is up.
+
 **It found nothing, but you know something came out**
 Spotify publishes per region at local midnight. Raise `LOOKBACK_DAYS` to `3`
 in `.env` and check `SPOTIFY_MARKET=NL` matches your country.

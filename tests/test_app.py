@@ -62,6 +62,7 @@ def make_config(tmp_path, dry_run=False, message_mode="per_track", template_name
             market="NL",
             include_groups=("album", "single"),
             album_pages_per_artist=1,
+            request_delay=0.0,
         ),
         whatsapp=WhatsAppConfig(
             enabled=True,

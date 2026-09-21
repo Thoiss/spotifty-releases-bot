@@ -36,11 +36,30 @@ REQUIRED_SCOPES = (
 )
 
 _MAX_TRACKS_PER_ADD = 100  # hard limit set by the Spotify API
+
+# /artists/{id}/albums rejects anything above 10 with "Invalid limit", even
+# though the documentation still says 50. Other paged endpoints do accept 50.
+_MAX_ALBUM_PAGE_LIMIT = 10
+
+# A Retry-After longer than this means we are properly blocked, not briefly
+# throttled; sitting in a retry loop would only make it worse.
+_UNRECOVERABLE_RETRY_AFTER_SECONDS = 300
+
 _MAX_ATTEMPTS = 4
 
 
 class SpotifyError(RuntimeError):
     """Any failure while talking to Spotify that we cannot recover from."""
+
+
+class SpotifyRateLimited(SpotifyError):
+    """Spotify has blocked us for a long period.
+
+    Kept separate from ``SpotifyError`` because the caller must treat it
+    differently: a single artist failing is worth skipping over, but being
+    rate limited means every following request would fail too, so the run has
+    to stop instead of hammering the API a few hundred more times.
+    """
 
 
 class SpotifyClient:
@@ -54,6 +73,7 @@ class SpotifyClient:
         market: str = "NL",
         session: requests.Session | None = None,
         timeout: float = 20.0,
+        request_delay: float = 0.35,
     ) -> None:
         self._client_id = client_id
         self._client_secret = client_secret
@@ -63,6 +83,8 @@ class SpotifyClient:
         self._timeout = timeout
         self._access_token: str | None = None
         self._access_token_expires_at: float = 0.0
+        self._request_delay = max(request_delay, 0.0)
+        self._last_request_at = 0.0
 
     # ------------------------------------------------------------------
     # Authentication
@@ -109,6 +131,21 @@ class SpotifyClient:
     # ------------------------------------------------------------------
     # Low level request helper
     # ------------------------------------------------------------------
+    def _wait_for_slot(self) -> None:
+        """Keep a minimum gap between requests.
+
+        Checking a few hundred followed artists means a few hundred calls. Sent
+        back to back they trip Spotify's rate limiter, and the penalty is not a
+        short pause but a block measured in hours. Spacing the calls out costs
+        a couple of minutes once a night and avoids that entirely.
+        """
+        if self._request_delay <= 0:
+            return
+        elapsed = time.monotonic() - self._last_request_at
+        if elapsed < self._request_delay:
+            time.sleep(self._request_delay - elapsed)
+        self._last_request_at = time.monotonic()
+
     def _request(self, method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         """Perform one API call, retrying on rate limits and transient errors.
 
@@ -121,6 +158,7 @@ class SpotifyClient:
 
         last_error = ""
         for attempt in range(1, _MAX_ATTEMPTS + 1):
+            self._wait_for_slot()
             token = self._ensure_access_token()
             headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
             try:
@@ -134,9 +172,19 @@ class SpotifyClient:
                 continue
 
             if response.status_code == 429:
-                wait_for = int(response.headers.get("Retry-After", "2")) + 1
-                _LOG.warning("Rate limited by Spotify; waiting %ds", wait_for)
-                time.sleep(min(wait_for, 60))
+                retry_after = _parse_retry_after(response.headers.get("Retry-After"))
+                if retry_after > _UNRECOVERABLE_RETRY_AFTER_SECONDS:
+                    # Spotify blocks an app for hours once it has been hammered.
+                    # Retrying cannot help, and every extra call risks extending
+                    # the block, so stop the run here with a clear explanation.
+                    raise SpotifyRateLimited(
+                        f"Spotify has rate limited this app for {retry_after // 3600}h "
+                        f"{(retry_after % 3600) // 60}m (Retry-After: {retry_after}s). "
+                        "No further requests will succeed until that expires. "
+                        "Raise SPOTIFY_REQUEST_DELAY so the next run paces itself."
+                    )
+                _LOG.warning("Rate limited by Spotify; waiting %ds", retry_after)
+                time.sleep(retry_after)
                 continue
 
             if response.status_code == 401:
@@ -207,13 +255,17 @@ class SpotifyClient:
         """Recent releases for one artist.
 
         Spotify returns the newest releases first, so for a nightly check a
-        single page of 50 is plenty; ``max_pages`` exists for the first run or
-        for very prolific artists.
+        single page is plenty; ``max_pages`` exists for the first run or for
+        very prolific artists.
+
+        The page size is capped at 10 because this endpoint rejects anything
+        larger with a 400 "Invalid limit", despite the documentation still
+        advertising 50.
         """
         albums: list[Album] = []
         params = {
             "include_groups": ",".join(include_groups),
-            "limit": 50,
+            "limit": _MAX_ALBUM_PAGE_LIMIT,
             "market": self._market,
         }
         url = f"/artists/{artist_id}/albums"
@@ -294,3 +346,11 @@ def _track_from_payload(item: dict[str, Any], album_name: str) -> Track | None:
         url=external.get("spotify", f"https://open.spotify.com/track/{track_id}"),
         album_name=album_name,
     )
+
+
+def _parse_retry_after(header_value: str | None) -> int:
+    """Seconds to wait from a Retry-After header, defaulting to a short pause."""
+    try:
+        return max(int(header_value or "2"), 1) + 1
+    except ValueError:
+        return 3

@@ -50,6 +50,7 @@ def _make_clients(config: AppConfig) -> tuple[SpotifyClient, WhatsAppClient | No
         client_secret=config.spotify.client_secret,
         refresh_token=config.spotify.refresh_token,
         market=config.spotify.market,
+        request_delay=config.spotify.request_delay,
     )
     whatsapp = None
     if config.whatsapp.enabled:

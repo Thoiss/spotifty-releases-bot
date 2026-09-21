@@ -10,7 +10,11 @@ import json
 
 import pytest
 
-from spotify_release_bot.spotify_client import SpotifyClient, SpotifyError
+from spotify_release_bot.spotify_client import (
+    SpotifyClient,
+    SpotifyError,
+    SpotifyRateLimited,
+)
 
 
 class FakeResponse:
@@ -53,7 +57,9 @@ def token_response(expires_in=3600):
 
 
 def make_client(session):
-    return SpotifyClient("id", "secret", "refresh", market="NL", session=session, timeout=1)
+    return SpotifyClient(
+        "id", "secret", "refresh", market="NL", session=session, timeout=1, request_delay=0.0
+    )
 
 
 def test_followed_artists_walks_cursor_pages():
@@ -195,3 +201,68 @@ def test_playlist_additions_are_chunked_at_one_hundred():
     assert added == 250
     post_calls = [r for r in session.requests if r[0] == "POST" and "playlists" in r[1]]
     assert len(post_calls) == 3  # 100 + 100 + 50
+
+
+def test_artist_albums_never_asks_for_more_than_ten():
+    """The endpoint 400s on limit > 10, so the page size must stay capped."""
+    captured = {}
+
+    class RecordingSession(FakeSession):
+        def request(self, method, url, **kwargs):
+            captured.update(kwargs.get("params") or {})
+            return super().request(method, url, **kwargs)
+
+    session = RecordingSession([token_response(), FakeResponse(payload={"items": [], "next": None})])
+    make_client(session).artist_albums("a1", include_groups=("album", "single"))
+    assert captured["limit"] <= 10
+
+
+def test_a_long_rate_limit_aborts_instead_of_retrying(monkeypatch):
+    """A multi-hour block must raise at once, not sit in a retry loop."""
+    slept = []
+    monkeypatch.setattr("spotify_release_bot.spotify_client.time.sleep", slept.append)
+    session = FakeSession(
+        [
+            token_response(),
+            FakeResponse(status_code=429, headers={"Retry-After": "86393"}, payload={}),
+        ]
+    )
+    with pytest.raises(SpotifyRateLimited, match="23h"):
+        make_client(session).artist_albums("a1", include_groups=("single",))
+    assert slept == []  # nothing waited on: it gave up immediately
+
+
+def test_a_short_rate_limit_is_still_retried(monkeypatch):
+    slept = []
+    monkeypatch.setattr("spotify_release_bot.spotify_client.time.sleep", slept.append)
+    session = FakeSession(
+        [
+            token_response(),
+            FakeResponse(status_code=429, headers={"Retry-After": "3"}, payload={}),
+            FakeResponse(payload={"items": [], "next": None}),
+        ]
+    )
+    assert make_client(session).artist_albums("a1", include_groups=("single",)) == []
+    assert slept == [4]  # Retry-After + 1 second of margin
+
+
+def test_requests_are_paced_when_a_delay_is_configured(monkeypatch):
+    """Consecutive calls must not be fired back to back."""
+    slept = []
+    monkeypatch.setattr("spotify_release_bot.spotify_client.time.sleep", slept.append)
+    monkeypatch.setattr(
+        "spotify_release_bot.spotify_client.time.monotonic", lambda: 1000.0
+    )
+    session = FakeSession(
+        [
+            token_response(),
+            FakeResponse(payload={"items": [], "next": None}),
+            FakeResponse(payload={"items": [], "next": None}),
+        ]
+    )
+    client = SpotifyClient(
+        "id", "secret", "refresh", market="NL", session=session, request_delay=0.5
+    )
+    client.artist_albums("a1", include_groups=("single",))
+    client.artist_albums("a2", include_groups=("single",))
+    assert any(abs(s - 0.5) < 0.01 for s in slept)

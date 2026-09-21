@@ -52,6 +52,19 @@ def _integer(name: str, default: int, minimum: int = 0) -> int:
     return value
 
 
+def _decimal(name: str, default: float, minimum: float = 0.0) -> float:
+    raw = _optional(name)
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a number, got {raw!r}") from exc
+    if value < minimum:
+        raise ConfigError(f"{name} must be >= {minimum}, got {value}")
+    return value
+
+
 def _parse_time(name: str, default: str) -> time:
     raw = _optional(name, default) or default
     try:
@@ -80,6 +93,7 @@ class SpotifyConfig:
     market: str
     include_groups: tuple[str, ...]
     album_pages_per_artist: int
+    request_delay: float
 
     @classmethod
     def from_env(cls) -> "SpotifyConfig":
@@ -102,6 +116,7 @@ class SpotifyConfig:
             market=_optional("SPOTIFY_MARKET", "NL") or "NL",
             include_groups=parsed_groups,
             album_pages_per_artist=_integer("SPOTIFY_ALBUM_PAGES_PER_ARTIST", 1, minimum=1),
+            request_delay=_decimal("SPOTIFY_REQUEST_DELAY", 0.35, minimum=0.0),
         )
 
 

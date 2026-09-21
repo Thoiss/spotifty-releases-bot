@@ -20,7 +20,7 @@ from .config import AppConfig
 from .models import Album, Track
 from .messages import build_messages, build_template_parameters
 from .release_finder import select_new_albums
-from .spotify_client import SpotifyClient, SpotifyError
+from .spotify_client import SpotifyClient, SpotifyError, SpotifyRateLimited
 from .state import StateStore
 from .whatsapp_client import WhatsAppClient
 
@@ -79,6 +79,12 @@ def run_once(
                     max_pages=config.spotify.album_pages_per_artist,
                 )
             )
+        except SpotifyRateLimited:
+            # Every following request would fail too, and each one risks
+            # extending the block, so stop rather than working through the
+            # rest of the list.
+            _LOG.error("Stopping this run: Spotify has rate limited the app")
+            raise
         except SpotifyError as exc:
             # One unreachable artist must not sink the whole run.
             message = f"Could not load albums for {artist.name}: {exc}"
