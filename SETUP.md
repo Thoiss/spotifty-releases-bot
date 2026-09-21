@@ -237,6 +237,42 @@ so without a template you would have to message it manually every single day.
    `Artist - Song https://open.spotify.com/track/abc`
 9. Submit. Approval usually takes minutes, sometimes a day.
 
+<details>
+<summary>The editor keeps rejecting the header, or you would rather skip it</summary>
+
+The template editor sometimes submits an empty `HEADER` component even when
+the header fields look blank, and then refuses to save with *"(text) is
+missing in the component of type HEADER"*. Two ways out:
+
+- **Give the header static text.** Type something fixed into *Koptekst*, e.g.
+  `New release`, and do not add a variable to it. An empty header is invalid;
+  a filled one is fine, and the bot never has to supply anything for it.
+- **Create the template over the API**, which builds exactly one `BODY`
+  component so no header can appear:
+
+  ```bash
+  curl -X POST "https://graph.facebook.com/v21.0/<WABA_ID>/message_templates" \
+    -H "Authorization: Bearer <ACCESS_TOKEN>" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "new_release",
+      "language": "en",
+      "category": "MARKETING",
+      "parameter_format": "POSITIONAL",
+      "components": [{
+        "type": "BODY",
+        "text": "New release: {{1}}",
+        "example": { "body_text": [["Artist - Song https://open.spotify.com/track/abc"]] }
+      }]
+    }'
+  ```
+
+  `parameter_format: POSITIONAL` is what produces `{{1}}` rather than a named
+  variable. If the call reports that the name already exists, delete the old
+  draft in WhatsApp Manager first, or pick another name and set
+  `WHATSAPP_TEMPLATE_NAME` to match.
+</details>
+
 > **The variable must read `{{1}}`, not `{{something}}`.** WhatsApp templates
 > come in two flavours: *positional* (`{{1}}`, `{{2}}`) and *named*
 > (`{{movie_name}}`). They are filled in differently over the API — a named
