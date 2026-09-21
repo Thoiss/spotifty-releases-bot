@@ -222,16 +222,29 @@ so without a template you would have to message it manually every single day.
 2. Category: **Utility**
 3. Name: `new_release` (lowercase and underscores only)
 4. Language: English (or Dutch — whatever you set in `WHATSAPP_TEMPLATE_LANGUAGE`)
-5. **Header: None** (*Geen*). Leave footer and buttons empty too.
-6. Body — exactly one variable:
+5. **Type variabele / Variable format: Nummer** (*Number* — positional).
+   This is the dropdown above the content fields, and it defaults to *Naam*
+   (*Name*). It must be **Nummer**, or the bot cannot fill the template in —
+   see the warning below.
+6. **Header: None** (*Geen*). Leave *Koptekst*, footer and buttons empty too.
+7. Body (*Tekst*) — exactly one variable:
 
    ```
    New release: {{1}}
    ```
 
-7. Provide a sample value when asked, e.g.
+8. Provide a sample value when asked, e.g.
    `Artist - Song https://open.spotify.com/track/abc`
-8. Submit. Approval usually takes minutes, sometimes a day.
+9. Submit. Approval usually takes minutes, sometimes a day.
+
+> **The variable must read `{{1}}`, not `{{something}}`.** WhatsApp templates
+> come in two flavours: *positional* (`{{1}}`, `{{2}}`) and *named*
+> (`{{movie_name}}`). They are filled in differently over the API — a named
+> template needs a `parameter_name` on every parameter. The bot sends
+> positional parameters, so a named template is rejected at send time, every
+> night, long after approval succeeded. If the preview on the right shows
+> anything other than `{{1}}`, change *Type variabele* to **Nummer** and
+> re-insert the variable.
 
 > **Set the header to None, not empty.** If the header type is left on *Text*
 > with nothing typed in it, saving fails with *"an expected field (or fields)
@@ -353,6 +366,11 @@ step 2, and make sure all three `SPOTIFY_*` values come from the *same* run.
 **`403` when adding tracks**
 You do not own the playlist, or the token lacks the playlist scopes. Check the
 playlist ID and redo step 2.
+
+**Messages rejected although the template is approved**
+The template probably uses *named* variables (`{{song}}`) instead of
+positional ones (`{{1}}`). Open it in WhatsApp Manager, set *Type variabele*
+to **Nummer**, and make the body read `New release: {{1}}`.
 
 **`an expected field (or fields) (text) is missing in the component of type HEADER`**
 The template has a header whose text is empty. Set the header to **None**
