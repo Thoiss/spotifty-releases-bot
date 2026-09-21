@@ -222,15 +222,25 @@ so without a template you would have to message it manually every single day.
 2. Category: **Utility**
 3. Name: `new_release` (lowercase and underscores only)
 4. Language: English (or Dutch — whatever you set in `WHATSAPP_TEMPLATE_LANGUAGE`)
-5. Body — exactly one variable:
+5. **Header: None** (*Geen*). Leave footer and buttons empty too.
+6. Body — exactly one variable:
 
    ```
    New release: {{1}}
    ```
 
-6. Provide a sample value when asked, e.g.
+7. Provide a sample value when asked, e.g.
    `Artist - Song https://open.spotify.com/track/abc`
-7. Submit. Approval usually takes minutes, sometimes a day.
+8. Submit. Approval usually takes minutes, sometimes a day.
+
+> **Set the header to None, not empty.** If the header type is left on *Text*
+> with nothing typed in it, saving fails with *"an expected field (or fields)
+> (text) is missing in the component of type HEADER"*. The bot sends a body
+> parameter only, so the template must not ask for anything else.
+>
+> A header containing **static** text is harmless if you want one. A header
+> with its own `{{1}}` variable is not — the bot would have to send a header
+> component as well, and every message would be rejected.
 
 ---
 
@@ -343,6 +353,10 @@ step 2, and make sure all three `SPOTIFY_*` values come from the *same* run.
 **`403` when adding tracks**
 You do not own the playlist, or the token lacks the playlist scopes. Check the
 playlist ID and redo step 2.
+
+**`an expected field (or fields) (text) is missing in the component of type HEADER`**
+The template has a header whose text is empty. Set the header to **None**
+(*Geen*) in the template editor, or type static text into it.
 
 **`error 131047`**
 The 24-hour WhatsApp window is closed. Set `WHATSAPP_TEMPLATE_NAME=new_release`
