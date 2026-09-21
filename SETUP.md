@@ -182,15 +182,35 @@ added here.
 ### 4c. Make the token permanent
 
 The temporary token dies after 24 hours, which would stop the bot overnight.
-Create a lasting one:
+Create a lasting one.
 
-1. **Business Settings** → **Users** → **System Users** → **Add**
-   - Name: `release-bot`, Role: **Admin**
-2. **Add Assets** → **Apps** → select your app → enable **Manage app**
-3. **Generate new token** → select your app → permissions:
+> **Business Settings is not in the app dashboard.** It lives on a different
+> site: <https://business.facebook.com/settings> (in Dutch,
+> *Bedrijfsinstellingen*). Going straight to
+> <https://business.facebook.com/settings/system-users> saves the hunt.
+
+1. In the left sidebar: **Users** → **System users** → **Add**.
+   - Name `release-bot`, role **Admin**.
+2. **Assign assets** — you need **both** of these, not just the app:
+   - **Apps** → your app → **Full control** / *Manage app*
+   - **WhatsApp accounts** → your WhatsApp Business account → **Full control** /
+     *Manage WhatsApp business accounts*
+3. **Generate new token** → select your app → tick:
    - `whatsapp_business_messaging`
    - `whatsapp_business_management`
 4. Set expiry to **Never** and copy the token. It is shown once only.
+
+Assigning only the app is the usual mistake: the token is created happily, then
+every send fails because it has no rights over the phone number. If that
+happens, go back to step 2 and add the WhatsApp account asset.
+
+<details>
+<summary>The business portfolio selector is empty or there is no business</summary>
+
+The app is not linked to a business portfolio yet. In the app dashboard go to
+**App settings → Basic**, find the **Business Account** field
+(*Bedrijfsaccount*), and link or create one. Then return to Business Settings.
+</details>
 
 ### 4d. Create a message template (strongly recommended)
 
