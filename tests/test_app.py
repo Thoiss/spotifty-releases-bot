@@ -52,7 +52,9 @@ class FakeWhatsApp:
         return len(self.sent)
 
 
-def make_config(tmp_path, dry_run=False, message_mode="per_track", template_name=""):
+def make_config(
+    tmp_path, dry_run=False, message_mode="per_track", template_name="", max_artists=0
+):
     return AppConfig(
         spotify=SpotifyConfig(
             client_id="id",
@@ -63,6 +65,7 @@ def make_config(tmp_path, dry_run=False, message_mode="per_track", template_name
             include_groups=("album", "single"),
             album_pages_per_artist=1,
             request_delay=0.0,
+            max_artists=max_artists,
         ),
         whatsapp=WhatsAppConfig(
             enabled=True,
@@ -205,3 +208,29 @@ def test_template_mode_sends_single_line_parameters(tmp_path):
     assert len(whatsapp.sent) == 1
     assert "\n" not in whatsapp.sent[0]
     assert "https://open.spotify.com/track/trk1" in whatsapp.sent[0]
+
+
+def test_max_artists_caps_how_many_are_checked(tmp_path):
+    """A capped run stops after N artists, so a test costs few requests."""
+    artists = [Artist(f"art{i}", f"Artist {i}") for i in range(10)]
+    spotify = FakeSpotify(
+        artists=artists,
+        albums_by_artist={
+            a.id: [make_album(f"alb{a.id}", release_date="2026-09-14")] for a in artists
+        },
+        tracks_by_album={f"alb{a.id}": [make_track(f"trk{a.id}")] for a in artists},
+    )
+    config = make_config(tmp_path, max_artists=3)
+
+    result = run_once(config, spotify, FakeWhatsApp(), StateStore(config.state_path), today=TODAY)
+
+    assert result.artists_checked == 3
+    assert len(result.new_albums) == 3
+
+
+def test_no_cap_checks_every_artist(tmp_path):
+    artists = [Artist(f"art{i}", f"Artist {i}") for i in range(5)]
+    spotify = FakeSpotify(artists=artists, albums_by_artist={}, tracks_by_album={})
+    config = make_config(tmp_path)
+    result = run_once(config, spotify, FakeWhatsApp(), StateStore(config.state_path), today=TODAY)
+    assert result.artists_checked == 5

@@ -63,10 +63,16 @@ def run_once(
     seen_album_ids = state.seen_album_ids()
 
     artists = spotify.followed_artists()
-    result.artists_checked = len(artists)
     if not artists:
         _LOG.warning("You do not follow any artists, so there is nothing to check")
         return result
+
+    if config.spotify.max_artists:
+        # Checking every artist costs one request each, which is what trips
+        # Spotify's rate limiter. A cap makes a test run cheap.
+        artists = artists[: config.spotify.max_artists]
+        _LOG.info("Only checking the first %d artists (SPOTIFY_MAX_ARTISTS)", len(artists))
+    result.artists_checked = len(artists)
 
     # 1. Gather candidate releases from every followed artist.
     candidates: list[Album] = []

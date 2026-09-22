@@ -94,6 +94,7 @@ class SpotifyConfig:
     include_groups: tuple[str, ...]
     album_pages_per_artist: int
     request_delay: float
+    max_artists: int
 
     @classmethod
     def from_env(cls) -> "SpotifyConfig":
@@ -116,7 +117,8 @@ class SpotifyConfig:
             market=_optional("SPOTIFY_MARKET", "NL") or "NL",
             include_groups=parsed_groups,
             album_pages_per_artist=_integer("SPOTIFY_ALBUM_PAGES_PER_ARTIST", 1, minimum=1),
-            request_delay=_decimal("SPOTIFY_REQUEST_DELAY", 0.35, minimum=0.0),
+            request_delay=_decimal("SPOTIFY_REQUEST_DELAY", 1.0, minimum=0.0),
+            max_artists=_integer("SPOTIFY_MAX_ARTISTS", 0, minimum=0),
         )
 
 

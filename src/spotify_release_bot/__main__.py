@@ -37,6 +37,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="run: daily schedule; once: single check; authorize: get a refresh token",
     )
     parser.add_argument(
+        "--max-artists",
+        type=int,
+        metavar="N",
+        help="only check the first N followed artists; useful for a cheap test run "
+        "that will not exhaust the Spotify rate limit",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="report what would happen without touching the playlist, WhatsApp or the state file",
@@ -85,6 +92,10 @@ def main(argv: list[str] | None = None) -> int:
         # argparse wins over the environment variable, so a manual test run is
         # always safe even when DRY_RUN is unset in .env.
         config = replace(config, dry_run=True)
+    if args.max_artists:
+        config = replace(
+            config, spotify=replace(config.spotify, max_artists=args.max_artists)
+        )
 
     configure_logging(config.log_level)
     spotify, whatsapp, state = _make_clients(config)

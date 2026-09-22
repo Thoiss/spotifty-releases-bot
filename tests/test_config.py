@@ -40,6 +40,8 @@ def clean_env(monkeypatch):
 
 def test_defaults_are_sensible(clean_env):
     config = AppConfig.from_env()
+    assert config.spotify.request_delay == 1.0   # pacing on by default
+    assert config.spotify.max_artists == 0       # 0 means "all of them"
     assert (config.run_at.hour, config.run_at.minute) == (0, 3)
     assert config.timezone.key == "Europe/Amsterdam"
     assert config.lookback_days == 2

@@ -441,10 +441,25 @@ artist; that endpoint now rejects anything above 10. Update with
 `git pull && docker compose up -d --build`.
 
 **`Spotify has rate limited this app for Xh Ym`**
-Too many requests too quickly, and Spotify blocks an app for hours once that
-happens. Nothing can shorten it — the block has to expire. Make sure
-`SPOTIFY_REQUEST_DELAY` is set (0.35 is the default) so the next run paces
-itself, then try again once the time is up.
+Too many requests too quickly. Spotify blocks an app for hours once that
+happens, and nothing can shorten it — the block has to expire.
+
+Every followed artist costs one request, so a few hundred artists is a few
+hundred requests per run. Apps in **Development mode** have a much smaller
+quota than approved ones, which is why this bites even at a modest pace.
+
+Once the block expires:
+
+1. Make sure `SPOTIFY_REQUEST_DELAY=1.0` (or higher) in `.env`. At one second
+   per artist a 350-artist run takes about six minutes, which is irrelevant for
+   a job that runs at night.
+2. Test with a handful of artists first, so a mistake costs almost nothing:
+
+   ```bash
+   docker compose run --rm spotify-release-bot once --dry-run --max-artists 10
+   ```
+
+3. Only once that works, run the full check.
 
 **It found nothing, but you know something came out**
 Spotify publishes per region at local midnight. Raise `LOOKBACK_DAYS` to `3`
