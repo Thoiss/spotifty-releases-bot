@@ -399,6 +399,18 @@ A line in `.env` is empty or misspelled. Compare against `.env.example`.
 The refresh token is wrong or was issued for different credentials. Redo
 step 2, and make sure all three `SPOTIFY_*` values come from the *same* run.
 
+**"Geen toestemmingen beschikbaar" / "No permissions available" when generating a token**
+The system user has no role on the app, so there is nothing to grant.
+Selecting the app inside the token wizard is not the same as being assigned to
+it. Go to the system user, **Assign assets → Apps**, tick the app, enable
+**Full control**, and save. Then generate the token again. The same panel is
+reachable from the other direction: **Accounts → Apps → [your app] → Add
+people → [the system user]**.
+
+**Lost the permanent token**
+It cannot be retrieved — Meta shows it once. Generate a new one and paste it
+into `.env` before closing the dialog.
+
 **`403` when adding tracks**
 You do not own the playlist, or the token lacks the playlist scopes. Check the
 playlist ID and redo step 2.
