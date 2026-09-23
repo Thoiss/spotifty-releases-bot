@@ -33,8 +33,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "command",
-        choices=("run", "once", "authorize"),
-        help="run: daily schedule; once: single check; authorize: get a refresh token",
+        choices=("run", "once", "check", "authorize"),
+        help="run: daily schedule; once: single check; check: verify credentials "
+    "and playlist access; authorize: get a refresh token",
     )
     parser.add_argument(
         "--max-artists",
@@ -117,6 +118,11 @@ def main(argv: list[str] | None = None) -> int:
         _LOG.info("Run finished: %s", result.summary())
         for error in result.errors:
             _LOG.warning("Run reported a problem: %s", error)
+
+    if args.command == "check":
+        from .diagnose import check
+
+        return 0 if check(config, spotify) else 1
 
     if args.command == "once":
         try:

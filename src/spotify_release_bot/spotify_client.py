@@ -30,9 +30,11 @@ API_BASE_URL = "https://api.spotify.com/v1"
 
 # Scopes the refresh token must have been granted.
 REQUIRED_SCOPES = (
-    "user-follow-read",          # read the artists you follow
-    "playlist-modify-private",   # add tracks to a private playlist
-    "playlist-modify-public",    # ... or a public one
+    "user-follow-read",              # read the artists you follow
+    "playlist-read-private",         # read a private playlist's existing tracks
+    "playlist-read-collaborative",   # ... or a collaborative one
+    "playlist-modify-private",       # add tracks to a private playlist
+    "playlist-modify-public",        # ... or a public one
 )
 
 _MAX_TRACKS_PER_ADD = 100  # hard limit set by the Spotify API
@@ -287,6 +289,18 @@ class SpotifyClient:
             if track is not None:
                 tracks.append(track)
         return tracks
+
+    def current_user(self) -> dict[str, Any]:
+        """The account the refresh token belongs to."""
+        return self._request("GET", "/me")
+
+    def playlist(self, playlist_id: str) -> dict[str, Any]:
+        """Metadata for one playlist: name, owner, visibility."""
+        return self._request(
+            "GET",
+            f"/playlists/{playlist_id}",
+            params={"fields": "id,name,public,collaborative,owner(id,display_name)"},
+        )
 
     def playlist_track_ids(self, playlist_id: str) -> set[str]:
         """IDs already in the target playlist, so we never add a duplicate."""

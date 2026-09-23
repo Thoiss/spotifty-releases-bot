@@ -151,6 +151,7 @@ python -m pytest
 | --- | --- |
 | `run` | Stay running and check daily at `RUN_AT`. This is the container default. |
 | `once` | Do one check now and exit. Useful for testing or a host cron job. |
+| `check` | Verify credentials and playlist access, reporting what is wrong. |
 | `authorize` | One-time browser login that prints a Spotify refresh token. |
 | `--dry-run` | Add to any command: report, change nothing. |
 
