@@ -87,6 +87,7 @@ class SpotifyClient:
         self._access_token_expires_at: float = 0.0
         self._request_delay = max(request_delay, 0.0)
         self._last_request_at = 0.0
+        self._granted_scopes: tuple[str, ...] = ()
 
     # ------------------------------------------------------------------
     # Authentication
@@ -118,6 +119,10 @@ class SpotifyClient:
 
         payload = response.json()
         self._access_token = payload["access_token"]
+        # Spotify echoes the scopes the refresh token actually carries. They are
+        # fixed at authorisation time, so this is the only reliable way to tell
+        # a stale token from a fresh one.
+        self._granted_scopes = tuple(sorted((payload.get("scope") or "").split()))
         # Refresh 60s early so a long run never trips over an expiring token.
         self._access_token_expires_at = time.monotonic() + int(payload.get("expires_in", 3600)) - 60
 
@@ -129,6 +134,15 @@ class SpotifyClient:
             self._refresh_token = rotated
 
         return self._access_token
+
+    @property
+    def granted_scopes(self) -> tuple[str, ...]:
+        """Scopes the refresh token carries; empty until the first refresh."""
+        return self._granted_scopes
+
+    def raw_get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Escape hatch for the diagnostics: one GET, exactly as specified."""
+        return self._request("GET", path, params=params or {})
 
     # ------------------------------------------------------------------
     # Low level request helper

@@ -33,6 +33,23 @@ def check(config: AppConfig, spotify: SpotifyClient) -> bool:
     my_id = me.get("id", "")
     _LOG.info("Authenticated as %s (%s)", me.get("display_name") or my_id, my_id)
 
+    # 1b. Which permissions does this token actually carry? Scopes are fixed
+    # when the refresh token is issued, so this distinguishes "the code was
+    # updated" from "the token was replaced" - which look identical otherwise.
+    granted = spotify.granted_scopes
+    missing = [scope for scope in REQUIRED_SCOPES if scope not in granted]
+    _LOG.info("Token scopes: %s", ", ".join(granted) or "(none reported)")
+    if missing:
+        ok = False
+        _LOG.error("Token is MISSING these scopes: %s", ", ".join(missing))
+        _LOG.error(
+            "Fix: run authorize again on the machine with a browser, and make sure "
+            "the new SPOTIFY_REFRESH_TOKEN really replaced the old one in .env on "
+            "the server. A token never gains scopes it was not created with."
+        )
+    else:
+        _LOG.info("All required scopes present.")
+
     # 2. Can we see the followed artists?
     try:
         artists = spotify.followed_artists()
@@ -85,10 +102,27 @@ def check(config: AppConfig, spotify: SpotifyClient) -> bool:
     except SpotifyError as exc:
         ok = False
         _LOG.error("Cannot read the playlist's tracks: %s", exc)
-        _LOG.error(
-            "Fix: re-run authorize. A token issued before the read scopes were "
-            "added keeps the scopes it was created with, forever."
-        )
+        if missing:
+            _LOG.error("Almost certainly the missing scopes listed above.")
+        else:
+            # The scopes are right, so narrow it down: retry without the query
+            # parameters the normal call adds, to see whether one of those is
+            # what Spotify objects to rather than the permission itself.
+            try:
+                spotify.raw_get(f"/playlists/{playlist_id}/tracks", {"limit": 1})
+                _LOG.error(
+                    "A plain request for the same tracks DID work, so the "
+                    "permission is fine and one of the query parameters is at "
+                    "fault. Please report this output."
+                )
+            except SpotifyError as plain_exc:
+                _LOG.error("A plain request fails too: %s", plain_exc)
+                _LOG.error(
+                    "Scopes are correct and you own the playlist, so this is "
+                    "unusual. Check whether the Spotify app is still in "
+                    "Development mode and that this account is listed under "
+                    "the app's User Management."
+                )
 
     if ok:
         _LOG.info("All checks passed. The bot should be able to run.")
