@@ -118,10 +118,11 @@ def check(config: AppConfig, spotify: SpotifyClient) -> bool:
             except SpotifyError as plain_exc:
                 _LOG.error("A plain request fails too: %s", plain_exc)
                 _LOG.error(
-                    "Scopes are correct and you own the playlist, so this is "
-                    "unusual. Check whether the Spotify app is still in "
-                    "Development mode and that this account is listed under "
-                    "the app's User Management."
+                    "Scopes are correct and you own the playlist. If the failing "
+                    "path ends in /tracks you are on an old version: Spotify "
+                    "removed that sub-resource in February 2026 and Development "
+                    "mode apps get a bare 403 from it. Update with "
+                    "'git pull && docker compose up -d --build'."
                 )
 
     if ok:

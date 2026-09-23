@@ -317,23 +317,34 @@ class SpotifyClient:
         )
 
     def playlist_track_ids(self, playlist_id: str) -> set[str]:
-        """IDs already in the target playlist, so we never add a duplicate."""
+        """IDs already in the target playlist, so we never add a duplicate.
+
+        Uses ``/items`` rather than ``/tracks``: Spotify's February 2026
+        migration removed the ``/tracks`` sub-resource, and apps in Development
+        mode get a bare 403 from it rather than a deprecation notice. The entry
+        holding the track was renamed from ``track`` to ``item`` at the same
+        time, so both spellings are accepted here.
+        """
         ids: set[str] = set()
-        params = {"fields": "items(track(id)),next", "limit": 100, "market": self._market}
-        for item in self._paginate(f"/playlists/{playlist_id}/tracks", params):
-            track = item.get("track") or {}
-            track_id = track.get("id")
+        params = {"fields": "items(item(id),track(id)),next", "limit": 100}
+        for entry in self._paginate(f"/playlists/{playlist_id}/items", params):
+            track = entry.get("item") or entry.get("track") or {}
+            track_id = track.get("id") if isinstance(track, dict) else None
             if track_id:
                 ids.add(track_id)
         _LOG.info("Target playlist currently holds %d tracks", len(ids))
         return ids
 
     def add_tracks_to_playlist(self, playlist_id: str, uris: list[str]) -> int:
-        """Append tracks, in chunks of 100 because that is the API maximum."""
+        """Append tracks, in chunks of 100 because that is the API maximum.
+
+        Posts to ``/items`` for the same reason as the read above: ``/tracks``
+        was removed in February 2026.
+        """
         added = 0
         for start in range(0, len(uris), _MAX_TRACKS_PER_ADD):
             chunk = uris[start : start + _MAX_TRACKS_PER_ADD]
-            self._request("POST", f"/playlists/{playlist_id}/tracks", json={"uris": chunk})
+            self._request("POST", f"/playlists/{playlist_id}/items", json={"uris": chunk})
             added += len(chunk)
             _LOG.info("Added %d track(s) to playlist %s", len(chunk), playlist_id)
         return added

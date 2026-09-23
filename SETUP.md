@@ -448,6 +448,14 @@ people → [the system user]**.
 It cannot be retrieved — Meta shows it once. Generate a new one and paste it
 into `.env` before closing the dialog.
 
+**`403` on `/playlists/{id}/tracks` specifically**
+Spotify removed that sub-resource in its February 2026 migration, and apps in
+Development mode get a bare 403 from it rather than a deprecation notice. It is
+now `/playlists/{id}/items`. Update the bot:
+`git pull && docker compose up -d --build`. Reading the playlist's *metadata*
+keeps working throughout, which is what makes this look like a permission
+problem when it is not.
+
 **`405` when adding tracks**
 The playlist id carried its `?si=...` tracking tail, which swallowed the rest
 of the request path. Recent versions strip it automatically — update with

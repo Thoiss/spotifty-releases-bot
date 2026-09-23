@@ -266,3 +266,72 @@ def test_requests_are_paced_when_a_delay_is_configured(monkeypatch):
     client.artist_albums("a1", include_groups=("single",))
     client.artist_albums("a2", include_groups=("single",))
     assert any(abs(s - 0.5) < 0.01 for s in slept)
+
+
+def test_playlist_items_uses_the_current_endpoint():
+    """/tracks was removed in Feb 2026; Development apps get a bare 403 from it."""
+    seen = {}
+
+    class RecordingSession(FakeSession):
+        def request(self, method, url, **kwargs):
+            seen.setdefault("urls", []).append(url)
+            return super().request(method, url, **kwargs)
+
+    session = RecordingSession(
+        [token_response(), FakeResponse(payload={"items": [], "next": None})]
+    )
+    make_client(session).playlist_track_ids("pl1")
+    assert any(u.endswith("/playlists/pl1/items") for u in seen["urls"])
+    assert not any("/playlists/pl1/tracks" in u for u in seen["urls"])
+
+
+def test_playlist_items_reads_the_renamed_item_field():
+    session = FakeSession(
+        [
+            token_response(),
+            FakeResponse(
+                payload={
+                    "items": [
+                        {"item": {"id": "t1"}},
+                        {"item": {"id": "t2"}},
+                    ],
+                    "next": None,
+                }
+            ),
+        ]
+    )
+    assert make_client(session).playlist_track_ids("pl1") == {"t1", "t2"}
+
+
+def test_playlist_items_still_accepts_the_old_track_field():
+    """Tolerate the pre-migration spelling rather than silently reading nothing."""
+    session = FakeSession(
+        [
+            token_response(),
+            FakeResponse(payload={"items": [{"track": {"id": "t1"}}], "next": None}),
+        ]
+    )
+    assert make_client(session).playlist_track_ids("pl1") == {"t1"}
+
+
+def test_playlist_items_skips_empty_entries():
+    """Removed or unavailable entries come back as nulls and must not crash."""
+    session = FakeSession(
+        [
+            token_response(),
+            FakeResponse(
+                payload={
+                    "items": [{"item": None}, {}, {"item": {"id": "t1"}}],
+                    "next": None,
+                }
+            ),
+        ]
+    )
+    assert make_client(session).playlist_track_ids("pl1") == {"t1"}
+
+
+def test_adding_tracks_posts_to_the_items_endpoint():
+    session = FakeSession([token_response(), FakeResponse(payload={"snapshot_id": "s"})])
+    make_client(session).add_tracks_to_playlist("pl1", ["spotify:track:t1"])
+    posts = [r for r in session.requests if r[0] == "POST" and "playlists" in r[1]]
+    assert posts and posts[0][1].endswith("/playlists/pl1/items")
