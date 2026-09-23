@@ -432,6 +432,12 @@ people → [the system user]**.
 It cannot be retrieved — Meta shows it once. Generate a new one and paste it
 into `.env` before closing the dialog.
 
+**`405` when adding tracks**
+The playlist id carried its `?si=...` tracking tail, which swallowed the rest
+of the request path. Recent versions strip it automatically — update with
+`git pull && docker compose up -d --build` — or set `SPOTIFY_PLAYLIST_ID` to
+the bare id.
+
 **`403` when adding tracks**
 You do not own the playlist, or the token lacks the playlist scopes. Check the
 playlist ID and redo step 2.

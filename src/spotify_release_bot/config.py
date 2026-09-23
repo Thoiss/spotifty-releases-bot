@@ -65,6 +65,40 @@ def _decimal(name: str, default: float, minimum: float = 0.0) -> float:
     return value
 
 
+def _parse_playlist_id(name: str) -> str:
+    """Accept anything that identifies a playlist and return the bare id.
+
+    People copy the playlist from Spotify's share menu, which yields a full URL
+    with a ``?si=`` tracking parameter attached. Left in place, that parameter
+    swallows the rest of the request path and every write fails with a baffling
+    405, so all three common forms are normalised here:
+
+        7De62i9jO2ctQfa9YfBi5O
+        https://open.spotify.com/playlist/7De62i9jO2ctQfa9YfBi5O?si=f874...
+        spotify:playlist:7De62i9jO2ctQfa9YfBi5O
+    """
+    raw = _require("SPOTIFY_PLAYLIST_ID")
+
+    if raw.startswith("spotify:"):
+        raw = raw.rsplit(":", 1)[-1]
+    elif "/" in raw:
+        raw = raw.rstrip("/").rsplit("/", 1)[-1]
+
+    # Drop a ?si=... or #fragment tail, whichever came along for the ride.
+    for separator in ("?", "&", "#"):
+        raw = raw.split(separator, 1)[0]
+    raw = raw.strip()
+
+    if not raw.isalnum():
+        raise ConfigError(
+            f"SPOTIFY_PLAYLIST_ID does not look like a playlist id: {raw!r}. "
+            "Use only the id from the share link, e.g. the "
+            "7De62i9jO2ctQfa9YfBi5O in "
+            "https://open.spotify.com/playlist/7De62i9jO2ctQfa9YfBi5O?si=..."
+        )
+    return raw
+
+
 def _parse_time(name: str, default: str) -> time:
     raw = _optional(name, default) or default
     try:
@@ -113,7 +147,7 @@ class SpotifyConfig:
             client_id=_require("SPOTIFY_CLIENT_ID"),
             client_secret=_require("SPOTIFY_CLIENT_SECRET"),
             refresh_token=_require("SPOTIFY_REFRESH_TOKEN"),
-            playlist_id=_require("SPOTIFY_PLAYLIST_ID"),
+            playlist_id=_parse_playlist_id("SPOTIFY_PLAYLIST_ID"),
             market=_optional("SPOTIFY_MARKET", "NL") or "NL",
             include_groups=parsed_groups,
             album_pages_per_artist=_integer("SPOTIFY_ALBUM_PAGES_PER_ARTIST", 1, minimum=1),

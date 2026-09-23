@@ -95,3 +95,36 @@ def test_unknown_message_mode_is_rejected(clean_env):
     clean_env.setenv("WHATSAPP_MESSAGE_MODE", "carrier_pigeon")
     with pytest.raises(ConfigError, match="per_track"):
         WhatsAppConfig.from_env()
+
+
+class TestPlaylistId:
+    """The share menu hands out a URL with a ?si= tail; all forms must work."""
+
+    def test_bare_id_passes_through(self, clean_env):
+        clean_env.setenv("SPOTIFY_PLAYLIST_ID", "7De62i9jO2ctQfa9YfBi5O")
+        assert SpotifyConfig.from_env().playlist_id == "7De62i9jO2ctQfa9YfBi5O"
+
+    def test_share_url_with_tracking_parameter(self, clean_env):
+        clean_env.setenv(
+            "SPOTIFY_PLAYLIST_ID",
+            "https://open.spotify.com/playlist/7De62i9jO2ctQfa9YfBi5O?si=f87470c061884674",
+        )
+        assert SpotifyConfig.from_env().playlist_id == "7De62i9jO2ctQfa9YfBi5O"
+
+    def test_id_with_only_the_tracking_parameter(self, clean_env):
+        # What actually caused the 405: the id pasted with its ?si= tail.
+        clean_env.setenv("SPOTIFY_PLAYLIST_ID", "7De62i9jO2ctQfa9YfBi5O?si=f87470c061884674")
+        assert SpotifyConfig.from_env().playlist_id == "7De62i9jO2ctQfa9YfBi5O"
+
+    def test_spotify_uri(self, clean_env):
+        clean_env.setenv("SPOTIFY_PLAYLIST_ID", "spotify:playlist:7De62i9jO2ctQfa9YfBi5O")
+        assert SpotifyConfig.from_env().playlist_id == "7De62i9jO2ctQfa9YfBi5O"
+
+    def test_surrounding_whitespace(self, clean_env):
+        clean_env.setenv("SPOTIFY_PLAYLIST_ID", "  7De62i9jO2ctQfa9YfBi5O  ")
+        assert SpotifyConfig.from_env().playlist_id == "7De62i9jO2ctQfa9YfBi5O"
+
+    def test_nonsense_is_rejected_with_an_example(self, clean_env):
+        clean_env.setenv("SPOTIFY_PLAYLIST_ID", "my playlist!")
+        with pytest.raises(ConfigError, match="does not look like a playlist id"):
+            SpotifyConfig.from_env()
