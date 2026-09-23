@@ -141,6 +141,22 @@ Then run the `authorize` command inside that SSH session. The redirect to
 `127.0.0.1:8080` on your laptop is tunnelled to the server.
 </details>
 
+### Re-authorising later
+
+A refresh token keeps the permissions it was created with, forever. If an
+update adds a scope — or a `check` run says the token lacks one — you have to
+run `authorize` again; updating the code alone changes nothing.
+
+It is the same two-machine dance as the first time:
+
+1. **On your laptop**, `git pull` first (otherwise the old scopes are
+   requested), activate the venv, and run `authorize`.
+2. **On your server**, `git pull`, replace `SPOTIFY_REFRESH_TOKEN` in `.env`
+   with the new value, then `docker compose build`.
+
+The client ID and secret never change, and neither does the playlist id. Only
+the refresh token is replaced.
+
 ---
 
 ## Step 3 — Get the playlist ID (laptop)
