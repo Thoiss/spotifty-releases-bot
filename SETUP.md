@@ -330,6 +330,26 @@ docker compose run --rm spotify-release-bot once --dry-run
 Read that output carefully. It lists the releases it found, the tracks it
 would add, and the exact WhatsApp messages it would send.
 
+Start small, because every artist costs one API request and a full run of
+several hundred is exactly what exhausts the Spotify rate limit:
+
+```bash
+docker compose run --rm spotify-release-bot once --dry-run --max-artists 10
+```
+
+`0 new release(s)` there is a healthy result, not a failure — it only means
+none of those ten artists released anything in the last two days. To prove the
+rest of the pipeline works, widen the window for one run so it has something to
+chew on:
+
+```bash
+docker compose run --rm spotify-release-bot once --dry-run --max-artists 10 --lookback-days 30
+```
+
+Now you should see releases listed, tracks that would be added, and the exact
+messages. Keep `--dry-run` on for that one: without it, a 30-day window would
+genuinely dump a month of back catalogue into your playlist.
+
 When it looks right, do it for real once:
 
 ```bash
@@ -382,6 +402,7 @@ Run finished: checked 143 artists, 2 new release(s), 3 track(s) added,
 | Follow the logs | `docker compose logs -f` |
 | Run a check right now | `docker compose run --rm spotify-release-bot once` |
 | See what it *would* do | `docker compose run --rm spotify-release-bot once --dry-run` |
+| Cheap test on a few artists | `docker compose run --rm spotify-release-bot once --dry-run --max-artists 10` |
 | Change a setting | `nano .env` then `docker compose up -d --force-recreate` |
 | Update to newer code | `git pull && docker compose up -d --build` |
 | Stop it | `docker compose down` |

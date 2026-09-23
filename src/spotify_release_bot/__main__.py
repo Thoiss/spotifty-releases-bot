@@ -44,6 +44,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "that will not exhaust the Spotify rate limit",
     )
     parser.add_argument(
+        "--lookback-days",
+        type=int,
+        metavar="N",
+        help="override LOOKBACK_DAYS for this run; widen it with --dry-run to prove "
+        "that detection works when nothing was released in the last day or two",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="report what would happen without touching the playlist, WhatsApp or the state file",
@@ -96,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
         config = replace(
             config, spotify=replace(config.spotify, max_artists=args.max_artists)
         )
+    if args.lookback_days:
+        config = replace(config, lookback_days=args.lookback_days)
 
     configure_logging(config.log_level)
     spotify, whatsapp, state = _make_clients(config)
