@@ -26,8 +26,8 @@ class FakeSpotify:
         self._playlist_ids = playlist_ids or set()
         self.added_uris: list[str] = []
 
-    def followed_artists(self):
-        return self._artists
+    def followed_artists(self, limit=None):
+        return self._artists[:limit] if limit else self._artists
 
     def artist_albums(self, artist_id, include_groups, max_pages=1):
         return self._albums_by_artist.get(artist_id, [])

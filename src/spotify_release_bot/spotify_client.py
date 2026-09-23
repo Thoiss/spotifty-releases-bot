@@ -243,11 +243,16 @@ class SpotifyClient:
     # ------------------------------------------------------------------
     # Endpoints this bot uses
     # ------------------------------------------------------------------
-    def followed_artists(self) -> list[Artist]:
-        """Every artist the authenticated user follows.
+    def followed_artists(self, limit: int | None = None) -> list[Artist]:
+        """Artists the authenticated user follows.
 
         This endpoint uses *cursor* paging (an ``after`` marker) rather than the
         usual offset paging, so it needs its own loop.
+
+        ``limit`` stops the paging early. A test run that only checks ten
+        artists has no use for the other pages, and on a tightly rationed
+        Development-mode quota those wasted requests are the difference between
+        a test costing 10 calls and costing 18.
         """
         artists: list[Artist] = []
         params: dict[str, Any] = {"type": "artist", "limit": 50}
@@ -255,6 +260,9 @@ class SpotifyClient:
             payload = self._request("GET", "/me/following", params=params).get("artists", {})
             for item in payload.get("items", []):
                 artists.append(Artist(id=item["id"], name=item["name"]))
+            if limit is not None and len(artists) >= limit:
+                _LOG.info("Stopped after %d followed artists (limit reached)", len(artists))
+                return artists[:limit]
             cursor = (payload.get("cursors") or {}).get("after")
             if not cursor or not payload.get("next"):
                 break

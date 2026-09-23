@@ -335,3 +335,24 @@ def test_adding_tracks_posts_to_the_items_endpoint():
     make_client(session).add_tracks_to_playlist("pl1", ["spotify:track:t1"])
     posts = [r for r in session.requests if r[0] == "POST" and "playlists" in r[1]]
     assert posts and posts[0][1].endswith("/playlists/pl1/items")
+
+
+def test_followed_artists_stops_paging_once_the_limit_is_reached():
+    """A capped test run must not pay for pages it will discard."""
+    session = FakeSession(
+        [
+            token_response(),
+            FakeResponse(
+                payload={
+                    "artists": {
+                        "items": [{"id": f"a{i}", "name": f"Artist {i}"} for i in range(50)],
+                        "next": "https://api.spotify.com/v1/me/following?after=a49",
+                        "cursors": {"after": "a49"},
+                    }
+                }
+            ),
+            # No second page queued: requesting one would raise.
+        ]
+    )
+    artists = make_client(session).followed_artists(limit=10)
+    assert len(artists) == 10
