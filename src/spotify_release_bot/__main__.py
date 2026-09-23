@@ -33,9 +33,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "command",
-        choices=("run", "once", "check", "authorize"),
+        choices=("run", "once", "check", "whatsapp-test", "authorize"),
         help="run: daily schedule; once: single check; check: verify credentials "
-    "and playlist access; authorize: get a refresh token",
+    "and playlist access; whatsapp-test: send one WhatsApp message and nothing "
+    "else; authorize: get a refresh token",
+    )
+    parser.add_argument(
+        "--message",
+        metavar="TEXT",
+        help="whatsapp-test only: the text to send instead of the sample",
     )
     parser.add_argument(
         "--max-artists",
@@ -88,6 +94,20 @@ def main(argv: list[str] | None = None) -> int:
         from .authorize import main as authorize_main
 
         return authorize_main([])
+
+    if args.command == "whatsapp-test":
+        # Deliberately loads only the WhatsApp settings: this must work even
+        # when the Spotify half is misconfigured or rate limited.
+        from .config import WhatsAppConfig
+        from .whatsapp_test import send_test_message
+
+        configure_logging("INFO")
+        try:
+            whatsapp_config = WhatsAppConfig.from_env()
+        except ConfigError as exc:
+            _LOG.error("Configuration problem: %s", exc)
+            return 2
+        return 0 if send_test_message(whatsapp_config, args.message) else 1
 
     try:
         config = AppConfig.from_env()

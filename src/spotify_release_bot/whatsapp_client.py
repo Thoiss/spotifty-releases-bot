@@ -34,7 +34,23 @@ _MAX_ATTEMPTS = 3
 
 
 class WhatsAppError(RuntimeError):
-    """A message could not be delivered to the Cloud API."""
+    """A message could not be delivered to the Cloud API.
+
+    Carries Meta's own error code and body where there was one, so callers can
+    react to a specific failure instead of pattern-matching the message text.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        code: int | None = None,
+        status: int | None = None,
+        body: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.status = status
+        self.body = body
 
 
 class WhatsAppClient:
@@ -95,14 +111,9 @@ class WhatsAppClient:
         }
         return self._post(payload)
 
-    def send_template(self, parameter: str) -> str:
-        """Send an approved template, filling its single {{1}} body variable.
-
-        The template must already be approved in the WhatsApp Manager, and its
-        body must contain exactly one variable, for example:
-        "New release: {{1}}".
-        """
-        payload: dict[str, Any] = {
+    def build_template_payload(self, parameter: str) -> dict[str, Any]:
+        """The exact body send_template posts. Exposed so a test can show it."""
+        return {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": self._recipient,
@@ -118,7 +129,15 @@ class WhatsAppClient:
                 ],
             },
         }
-        return self._post(payload)
+
+    def send_template(self, parameter: str) -> str:
+        """Send an approved template, filling its single {{1}} body variable.
+
+        The template must already be approved in the WhatsApp Manager, and its
+        body must contain exactly one variable, for example:
+        "New release: {{1}}".
+        """
+        return self._post(self.build_template_payload(parameter))
 
     def send_all(self, bodies: Sequence[str], max_messages: int) -> int:
         """Send several messages, pacing them and never exceeding ``max_messages``.
@@ -178,7 +197,10 @@ class WhatsAppClient:
                     "WhatsApp refused the message because the 24-hour customer service "
                     "window is closed (error 131047). Either send any message from your "
                     "own WhatsApp to the business number to reopen it, or configure "
-                    "WHATSAPP_TEMPLATE_NAME with an approved template. See the README."
+                    "WHATSAPP_TEMPLATE_NAME with an approved template. See the README.",
+                    code=_REENGAGEMENT_ERROR_CODE,
+                    status=response.status_code,
+                    body=response.text,
                 )
 
             if response.status_code >= 500 or response.status_code == 429:
@@ -189,7 +211,10 @@ class WhatsAppClient:
 
             raise WhatsAppError(
                 f"WhatsApp API rejected the message ({response.status_code}): "
-                f"{response.text[:300]}"
+                f"{response.text[:300]}",
+                code=error.get("code"),
+                status=response.status_code,
+                body=response.text,
             )
 
         raise WhatsAppError(

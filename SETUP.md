@@ -475,6 +475,20 @@ to **Nummer**, and make the body read `New release: {{1}}`.
 The template has a header whose text is empty. Set the header to **None**
 (*Geen*) in the template editor, or type static text into it.
 
+**Debugging WhatsApp without spending Spotify quota**
+A full run costs hundreds of Spotify requests, which is a poor way to discover
+that a template name is wrong. This sends exactly one message and reads only
+the `WHATSAPP_*` settings:
+
+```bash
+docker compose run --rm spotify-release-bot whatsapp-test
+docker compose run --rm spotify-release-bot whatsapp-test --message "Artist - Song https://open.spotify.com/track/abc"
+```
+
+It prints the endpoint, the recipient, the redacted token and the exact request
+body, then either the accepted message id or Meta's error code together with
+what that code means.
+
 **`error 131047`**
 The 24-hour WhatsApp window is closed. Set `WHATSAPP_TEMPLATE_NAME=new_release`
 in `.env` (step 4d), or send any message from your phone to the business

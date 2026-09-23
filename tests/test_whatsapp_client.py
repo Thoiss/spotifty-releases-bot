@@ -93,3 +93,31 @@ def test_transient_server_error_is_retried(monkeypatch):
     monkeypatch.setattr("spotify_release_bot.whatsapp_client.time.sleep", lambda _: None)
     session = FakeSession([FakeResponse(status_code=503, payload={}), FakeResponse()])
     assert make_client(session).send("hi") == "wamid.1"
+
+
+def test_error_carries_metas_code_and_body():
+    """The numeric code is what identifies the problem; keep it structured."""
+    session = FakeSession(
+        [FakeResponse(status_code=400, payload={"error": {"code": 132000, "message": "x"}})]
+    )
+    with pytest.raises(WhatsAppError) as caught:
+        make_client(session).send("hi")
+    assert caught.value.code == 132000
+    assert caught.value.status == 400
+    assert "132000" in caught.value.body
+
+
+def test_reengagement_error_also_carries_its_code():
+    session = FakeSession([FakeResponse(status_code=400, payload={"error": {"code": 131047}})])
+    with pytest.raises(WhatsAppError) as caught:
+        make_client(session).send("hi")
+    assert caught.value.code == 131047
+
+
+def test_template_payload_matches_what_is_sent():
+    """The test command prints this; it must be the real body, not a mock-up."""
+    session = FakeSession([FakeResponse()])
+    client = make_client(session, template_name="new_release", template_language="en")
+    shown = client.build_template_payload("Artist - Song https://example.test")
+    client.send("Artist - Song https://example.test")
+    assert shown == session.payloads[0]
