@@ -127,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.lookback_days:
         config = replace(config, lookback_days=args.lookback_days)
 
-    configure_logging(config.log_level)
+    configure_logging(config.log_level, config.timezone)
     spotify, whatsapp, state = _make_clients(config)
 
     if config.dry_run:

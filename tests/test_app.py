@@ -53,7 +53,13 @@ class FakeWhatsApp:
 
 
 def make_config(
-    tmp_path, dry_run=False, message_mode="per_track", template_name="", max_artists=0
+    tmp_path,
+    dry_run=False,
+    message_mode="per_track",
+    template_name="",
+    max_artists=0,
+    artists_per_run=0,
+    lookback_days=2,
 ):
     return AppConfig(
         spotify=SpotifyConfig(
@@ -66,6 +72,7 @@ def make_config(
             album_pages_per_artist=1,
             request_delay=0.0,
             max_artists=max_artists,
+            artists_per_run=artists_per_run,
         ),
         whatsapp=WhatsAppConfig(
             enabled=True,
@@ -80,7 +87,7 @@ def make_config(
         ),
         run_at=time(0, 3),
         timezone=ZoneInfo("Europe/Amsterdam"),
-        lookback_days=2,
+        lookback_days=lookback_days,
         state_path=str(tmp_path / "state.json"),
         dry_run=dry_run,
         log_level="INFO",
@@ -234,3 +241,58 @@ def test_no_cap_checks_every_artist(tmp_path):
     config = make_config(tmp_path)
     result = run_once(config, spotify, FakeWhatsApp(), StateStore(config.state_path), today=TODAY)
     assert result.artists_checked == 5
+
+
+class TestArtistRotation:
+    """Spreading the artist list over several nights keeps each run cheap."""
+
+    def _spotify(self, count=10):
+        artists = [Artist(f"art{i}", f"Artist {i}") for i in range(count)]
+        return artists, FakeSpotify(artists=artists, albums_by_artist={}, tracks_by_album={})
+
+    def test_only_a_slice_is_checked_per_run(self, tmp_path):
+        artists, spotify = self._spotify(10)
+        config = make_config(tmp_path, artists_per_run=4, lookback_days=5)
+        result = run_once(config, spotify, FakeWhatsApp(), StateStore(config.state_path), today=TODAY)
+        assert result.artists_checked == 4
+
+    def test_consecutive_runs_advance_through_the_list(self, tmp_path):
+        artists, spotify = self._spotify(10)
+        config = make_config(tmp_path, artists_per_run=4, lookback_days=5)
+
+        seen: list[str] = []
+        for _ in range(3):
+            state = StateStore(config.state_path)
+            run_once(config, spotify, FakeWhatsApp(), state, today=TODAY)
+            state.load()
+            seen.append(",".join(sorted(state.checked_artists())))
+
+        # Each run adds new artists rather than repeating the first slice.
+        assert len(seen[0].split(",")) == 4
+        assert len(seen[1].split(",")) == 8
+        # Tenth artist reached, so the cycle restarted on the third run.
+        assert len(seen[2].split(",")) in (2, 10)
+
+    def test_the_cycle_restarts_once_everyone_is_checked(self, tmp_path):
+        artists, spotify = self._spotify(4)
+        config = make_config(tmp_path, artists_per_run=4, lookback_days=5)
+
+        state = StateStore(config.state_path)
+        run_once(config, spotify, FakeWhatsApp(), state, today=TODAY)
+        second = run_once(config, spotify, FakeWhatsApp(), StateStore(config.state_path), today=TODAY)
+
+        # Everyone was checked in run one, so run two starts over rather than
+        # finding nobody left to check.
+        assert second.artists_checked == 4
+
+    def test_a_too_short_lookback_is_warned_about(self, tmp_path, caplog):
+        artists, spotify = self._spotify(10)
+        config = make_config(tmp_path, artists_per_run=2, lookback_days=2)
+        run_once(config, spotify, FakeWhatsApp(), StateStore(config.state_path), today=TODAY)
+        assert "releases can be missed" in caplog.text
+
+    def test_rotation_is_off_by_default(self, tmp_path):
+        artists, spotify = self._spotify(10)
+        config = make_config(tmp_path)
+        result = run_once(config, spotify, FakeWhatsApp(), StateStore(config.state_path), today=TODAY)
+        assert result.artists_checked == 10

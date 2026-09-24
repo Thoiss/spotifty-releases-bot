@@ -129,6 +129,7 @@ class SpotifyConfig:
     album_pages_per_artist: int
     request_delay: float
     max_artists: int
+    artists_per_run: int
 
     @classmethod
     def from_env(cls) -> "SpotifyConfig":
@@ -153,6 +154,7 @@ class SpotifyConfig:
             album_pages_per_artist=_integer("SPOTIFY_ALBUM_PAGES_PER_ARTIST", 1, minimum=1),
             request_delay=_decimal("SPOTIFY_REQUEST_DELAY", 1.0, minimum=0.0),
             max_artists=_integer("SPOTIFY_MAX_ARTISTS", 0, minimum=0),
+            artists_per_run=_integer("SPOTIFY_ARTISTS_PER_RUN", 0, minimum=0),
         )
 
 

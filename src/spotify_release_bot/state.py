@@ -31,6 +31,7 @@ class StateStore:
         self._path = path
         self._seen: dict[str, str] = {}
         self._last_run: str | None = None
+        self._checked_artists: set[str] = set()
 
     @property
     def path(self) -> str:
@@ -72,6 +73,10 @@ class StateStore:
         else:
             _LOG.warning("State file %s has an unreadable seen_albums field", self._path)
 
+        checked = payload.get("checked_artists", [])
+        if isinstance(checked, list):
+            self._checked_artists = {str(a) for a in checked}
+
         last_run = payload.get("last_run")
         self._last_run = str(last_run) if last_run else None
         _LOG.info("Loaded %d previously handled albums from %s", len(self._seen), self._path)
@@ -80,6 +85,17 @@ class StateStore:
         stamp = today.isoformat()
         for album_id in album_ids:
             self._seen.setdefault(album_id, stamp)
+
+    def checked_artists(self) -> set[str]:
+        """Artists already visited in the current rotation cycle."""
+        return set(self._checked_artists)
+
+    def mark_artists_checked(self, artist_ids: Iterable[str]) -> None:
+        self._checked_artists.update(artist_ids)
+
+    def start_new_artist_cycle(self) -> None:
+        """Everyone has been checked; begin again from the top."""
+        self._checked_artists = set()
 
     def prune(self, today: date, retention_days: int) -> int:
         """Drop entries older than the retention window. Returns how many went."""
@@ -108,6 +124,7 @@ class StateStore:
             "version": _CURRENT_VERSION,
             "last_run": last_run_iso,
             "seen_albums": self._seen,
+            "checked_artists": sorted(self._checked_artists),
         }
         directory = os.path.dirname(os.path.abspath(self._path)) or "."
         os.makedirs(directory, exist_ok=True)

@@ -526,6 +526,19 @@ Once the block expires:
 
 3. Only once that works, run the full check.
 
+If a full nightly run keeps getting blocked partway through, the quota rather
+than the pace is the limit, and slowing down cannot fix it. Spread the artists
+over several nights instead:
+
+```
+SPOTIFY_ARTISTS_PER_RUN=120
+LOOKBACK_DAYS=4
+```
+
+With 360 followed artists that checks each one every third night. The lookback
+window must be longer than a full cycle or releases fall between checks — the
+bot warns at startup if the two do not line up.
+
 **It found nothing, but you know something came out**
 Spotify publishes per region at local midnight. Raise `LOOKBACK_DAYS` to `3`
 in `.env` and check `SPOTIFY_MARKET=NL` matches your country.

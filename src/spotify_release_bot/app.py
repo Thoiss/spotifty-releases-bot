@@ -13,11 +13,12 @@ readable as a description of *what* happens rather than *how*.
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from .config import AppConfig
-from .models import Album, Track
+from .models import Album, Artist, Track
 from .messages import build_messages, build_template_parameters
 from .release_finder import select_new_albums
 from .spotify_client import SpotifyClient, SpotifyError, SpotifyRateLimited
@@ -71,6 +72,9 @@ def run_once(
         # Checking every artist costs one request each, which is what trips
         # Spotify's rate limiter. A cap makes a test run cheap.
         _LOG.info("Only checking the first %d artists (SPOTIFY_MAX_ARTISTS)", len(artists))
+    elif config.spotify.artists_per_run:
+        artists = _select_rotation_slice(artists, state, config, today)
+
     result.artists_checked = len(artists)
 
     # 1. Gather candidate releases from every followed artist.
@@ -103,6 +107,7 @@ def run_once(
         "Found %d new release(s) out of %d candidate album(s)", len(new_albums), len(candidates)
     )
     if not new_albums:
+        state.mark_artists_checked(a.id for a in artists)
         _finish(state, today, config, [])
         return result
 
@@ -143,6 +148,7 @@ def run_once(
 
     if not fresh_tracks:
         _LOG.info("Every track from the new releases was already in the playlist")
+        state.mark_artists_checked(a.id for a in artists)
         _finish(state, today, config, handled_album_ids)
         return result
 
@@ -185,8 +191,58 @@ def run_once(
         _LOG.info("WhatsApp is disabled; skipping notifications")
 
     # 7. Remember what we handled, so tomorrow's run stays quiet about it.
+    state.mark_artists_checked(a.id for a in artists)
     _finish(state, today, config, handled_album_ids)
     return result
+
+
+def _select_rotation_slice(
+    artists: list[Artist],
+    state: StateStore,
+    config: AppConfig,
+    today: date,
+) -> list[Artist]:
+    """Return this run's share of the artists, rotating through them nightly.
+
+    One request per artist means a few hundred followed artists is a few
+    hundred requests, and a Spotify app in Development mode is blocked for
+    hours well before that. Pacing the requests does not help once the quota
+    itself is the limit, so the list is split across several nights instead.
+
+    Nothing is missed as long as the lookback window is at least as long as a
+    full cycle: an artist checked every third night, with a four-day window,
+    still has every release seen. The check below says so out loud rather than
+    leaving it as a trap.
+    """
+    per_run = config.spotify.artists_per_run
+    already_checked = state.checked_artists()
+    remaining = [artist for artist in artists if artist.id not in already_checked]
+
+    if not remaining:
+        _LOG.info("Every artist has been checked; starting a new cycle")
+        state.start_new_artist_cycle()
+        remaining = list(artists)
+
+    cycle_runs = max(1, math.ceil(len(artists) / per_run))
+    if config.lookback_days < cycle_runs + 1:
+        _LOG.warning(
+            "LOOKBACK_DAYS is %d but a full cycle takes %d runs; releases can be "
+            "missed. Set LOOKBACK_DAYS to at least %d, or raise "
+            "SPOTIFY_ARTISTS_PER_RUN.",
+            config.lookback_days,
+            cycle_runs,
+            cycle_runs + 1,
+        )
+
+    selected = remaining[:per_run]
+    _LOG.info(
+        "Checking %d of %d artists this run (%d left in this cycle of %d runs)",
+        len(selected),
+        len(artists),
+        max(len(remaining) - len(selected), 0),
+        cycle_runs,
+    )
+    return selected
 
 
 def _finish(state: StateStore, today: date, config: AppConfig, album_ids: list[str]) -> None:
